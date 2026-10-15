@@ -1,0 +1,740 @@
+'use client';
+import { fx } from '@/lib/fx';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  AlertTriangle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  FileUp,
+  PackageSearch,
+  Pencil,
+  Plus,
+  Search,
+  Send,
+  ShoppingCart,
+  SlidersHorizontal,
+  Trash2,
+  X,
+  Wand2,
+  ClipboardCheck,
+  PackageX,
+} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Posto, StockItem, StockMovement } from '@/lib/almoxarifado/types';
+import { compareItems, downloadCsv, fold, isLow, itemLabel, money, num, refLabel } from '@/lib/almoxarifado/stockFormat';
+import { useToast } from '../core/Toasts';
+import { api } from '../core/api';
+import { ImportDialog } from './ImportDialog';
+import { ConfirmModal } from '../core/Modal';
+import { MovementFeed, MovementRow } from './Movements';
+import { LoadError } from './LoadError';
+import { ItemFormModal, QtyModal, SendModal, type QtyKind } from './StockModals';
+import { CategoryPicker } from './CategoryPicker';
+import { categoryKey, categoryOptions, countCategories, findCategory, hasCategory } from '@/lib/almoxarifado/categories';
+import { useLycoBus } from '@/lib/lyco/bus';
+import { ClassifySheet, InventorySheet, WriteoffSheet, groupName, useCatalog } from './CatalogTools';
+import { categoryName } from '@/lib/catalog';
+import './estoque.css';
+
+type Filter = 'todos' | 'baixo' | 'zerado' | 'postos';
+type SortKey = 'nome' | 'menor' | 'maior' | 'valor' | 'recente';
+const PAGE = 150;
+/** filtro de categoria: '' = todas · NONE = itens sem categoria */
+const NONE = '__sem__';
+
+const TAG_TONE: Record<string, string> = {
+  fardamento: 't-farda',
+  equipamento: 't-equip',
+  limpeza: 't-limpeza',
+  epi: 't-epi',
+  higienizado: 't-higienizado',
+};
+export function CategoryTags({ list, empty }: { list: string[]; empty?: string }) {
+  if (!list.length) return empty ? <span className="cat-tags"><span className="cat-tag">{empty}</span></span> : null;
+  return (
+    <span className="cat-tags">
+      {list.map((c) => (
+        <span key={c} className={`cat-tag ${TAG_TONE[categoryKey(c)] ?? ''}`}>
+          {c}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+export function Estoque({
+  items,
+  postos,
+  reload,
+  version,
+  failed,
+  onPurchase,
+  canInventory,
+}: {
+  /** abre o pedido de compra já com este item (quem pode pedir compras) */
+  onPurchase?: (itemId: string) => void;
+  /** inventário (contagem geral): só o master do Almoxarifado */
+  canInventory?: boolean;
+  items: StockItem[] | null;
+  postos: Posto[] | null;
+  reload: () => Promise<void>;
+  version: number;
+  failed?: boolean;
+}) {
+  const [view, setView] = useState<'itens' | 'historico'>('itens');
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<Filter>('todos');
+  const [cat, setCat] = useState('');
+  const [sort, setSort] = useState<SortKey>('nome');
+  const [limit, setLimit] = useState(PAGE);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [form, setForm] = useState<{ item: StockItem | null } | null>(null);
+  const [qty, setQty] = useState<{ itemId: string; kind: QtyKind } | null>(null);
+  const [send, setSend] = useState<{ itemId?: string } | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [del, setDel] = useState<StockItem | null>(null);
+  const [delBusy, setDelBusy] = useState(false);
+  const [classify, setClassify] = useState(false);
+  const [inventory, setInventory] = useState(false);
+  const [writeoff, setWriteoff] = useState<StockItem | null>(null);
+  const catalog = useCatalog();
+  const toast = useToast();
+
+  // pedidos do Lyco: "o que está com estoque baixo", "quanto tem de bota 42"
+  useLycoBus('almox:estoque', (p) => {
+    setView('itens');
+    if (p.filter) setFilter(p.filter);
+    if (p.category !== undefined) setCat(p.category === NONE ? NONE : p.category ? findCategory(p.category, cats.map((c) => c.name)) ?? '' : '');
+    if (p.query !== undefined) setQuery(p.query);
+    if (p.openId) setOpenId(p.openId);
+  });
+
+  const list = useMemo(() => items ?? [], [items]);
+  const cats = useMemo(() => countCategories(list), [list]);
+  const options = useMemo(() => categoryOptions(list), [list]);
+  const uncategorized = useMemo(() => list.filter((i) => !i.categories.length).length, [list]);
+  // se a categoria escolhida deixar de existir (último item saiu dela), volta para "Todas"
+  useEffect(() => {
+    if (!items || !cat) return;
+    if (cat === NONE ? uncategorized === 0 : !cats.some((c) => c.name === cat)) setCat('');
+  }, [items, cat, cats, uncategorized]);
+  /** itens da categoria escolhida: os números do topo e os filtros acompanham */
+  const scoped = useMemo(
+    () => (!cat ? list : cat === NONE ? list.filter((i) => !i.categories.length) : list.filter((i) => hasCategory(i, cat))),
+    [list, cat],
+  );
+  const stats = useMemo(() => {
+    let almox = 0;
+    let atPostos = 0;
+    let value = 0;
+    let low = 0;
+    let zero = 0;
+    let inPostos = 0;
+    for (const i of scoped) {
+      almox += i.quantity;
+      atPostos += i.at_postos;
+      if (i.cost !== null) value += i.quantity * i.cost;
+      if (isLow(i)) low++;
+      if (i.quantity === 0) zero++;
+      if (i.at_postos > 0) inPostos++;
+    }
+    return { almox, atPostos, value, low, zero, inPostos };
+  }, [scoped]);
+
+  const shown = useMemo(() => {
+    const t = fold(query.trim());
+    const out = scoped.filter((i) => {
+      if (filter === 'baixo' && !isLow(i)) return false;
+      if (filter === 'zerado' && i.quantity !== 0) return false;
+      if (filter === 'postos' && i.at_postos <= 0) return false;
+      if (!t) return true;
+      return fold(`${i.name} ${i.size ?? ''} ${i.unit} ${refLabel(i.ref)} ${i.code ?? ''} ${i.brand ?? ''} ${i.location ?? ''} ${i.categories.join(' ')}`).includes(t);
+    });
+    const cmp: Record<SortKey, (a: StockItem, b: StockItem) => number> = {
+      nome: compareItems,
+      menor: (a, b) => a.quantity - b.quantity || compareItems(a, b),
+      maior: (a, b) => b.quantity - a.quantity || compareItems(a, b),
+      valor: (a, b) => b.quantity * (b.cost ?? 0) - a.quantity * (a.cost ?? 0) || compareItems(a, b),
+      recente: (a, b) => b.created_at.localeCompare(a.created_at) || compareItems(a, b),
+    };
+    return out.sort(cmp[sort]);
+  }, [scoped, query, filter, sort]);
+
+  useEffect(() => setLimit(PAGE), [query, filter, sort, cat]);
+
+  const exportCsv = () => {
+    const rows = [...list].sort(compareItems).map((i) => [
+      i.code ?? '',
+      refLabel(i.ref),
+      i.name,
+      i.size ?? '',
+      i.categories.join(', '),
+      i.unit,
+      i.quantity,
+      i.at_postos,
+      i.quantity + i.at_postos,
+      i.min_quantity,
+      i.cost === null ? '' : String(i.cost).replace('.', ','),
+      i.cost === null ? '' : String(Math.round(i.quantity * i.cost * 100) / 100).replace('.', ','),
+      i.reserved,
+      i.quantity - i.reserved,
+      i.brand ?? '',
+      i.ca_number ?? '',
+      i.location ?? '',
+    ]);
+    downloadCsv(`estoque-${new Date().toISOString().slice(0, 10)}.csv`, ['Código', 'Ref', 'Item', 'Tamanho', 'Categorias', 'Unidade', 'Almoxarifado', 'Nos postos', 'Total', 'Mínimo', 'Custo unitário', 'Valor em estoque', 'Reservado', 'Disponível', 'Marca/modelo', 'CA', 'Localização'], rows);
+  };
+
+  const openItem = openId ? list.find((i) => i.id === openId) ?? null : null;
+  const qtyItem = qty ? list.find((i) => i.id === qty.itemId) ?? null : null;
+
+  // se o item aberto for excluído por outra pessoa, fecha a gaveta
+  useEffect(() => {
+    if (openId && items && !items.some((i) => i.id === openId)) setOpenId(null);
+  }, [items, openId]);
+
+  const FILTERS: { id: Filter; label: string; n: number }[] = [
+    { id: 'todos', label: 'Todos', n: scoped.length },
+    { id: 'baixo', label: 'Estoque baixo', n: stats.low },
+    { id: 'zerado', label: 'Sem saldo', n: stats.zero },
+    { id: 'postos', label: 'Nos postos', n: stats.inPostos },
+  ];
+
+  return (
+    <div className="section-scroll">
+      <div className="section-pad wide">
+        <div className="section-head">
+          <div>
+            <h1>Estoque</h1>
+            <p>Saldo do almoxarifado e dos postos.</p>
+          </div>
+          <div className="head-actions">
+            {catalog.ready && list.some((i) => !i.code) ? (
+              <button data-lyco="estoque-classificar" className="btn btn-ghost edit-only" onClick={() => setClassify(true)} title="Sugere categoria e grupo e gera os códigos CC-GG-NNNN">
+                <Wand2 size={18} /> Classificar ({num(list.filter((i) => !i.code).length)})
+              </button>
+            ) : null}
+            {canInventory && catalog.ready ? (
+              <button data-lyco="estoque-inventario" className="btn btn-ghost edit-only" onClick={() => setInventory(true)} disabled={!items?.length}>
+                <ClipboardCheck size={18} /> Inventário
+              </button>
+            ) : null}
+            <button data-lyco="estoque-importar" className="btn btn-ghost edit-only" onClick={() => setImporting(true)}>
+              <FileUp size={18} /> Importar planilha
+            </button>
+            <button className="btn btn-ghost" onClick={exportCsv} disabled={!list.length}>
+              <Download size={18} /> Exportar
+            </button>
+            <button className="btn btn-ghost edit-only" onClick={() => setSend({})} disabled={!items || !postos}>
+              <Send size={17} /> Transferir
+            </button>
+            <button data-lyco="item-novo" className="btn btn-primary edit-only" onClick={() => setForm({ item: null })}>
+              <Plus size={18} /> Novo item
+            </button>
+          </div>
+        </div>
+
+        <div className="stat-grid">
+          <div className="stat">
+            <small>{cat ? (cat === NONE ? 'Itens sem categoria' : `Itens · ${cat}`) : 'Itens cadastrados'}</small>
+            <b>{items ? num(scoped.length) : '…'}</b>
+          </div>
+          <div className="stat">
+            <small>Unidades no almoxarifado</small>
+            <b>{items ? num(stats.almox) : '…'}</b>
+          </div>
+          <div className="stat">
+            <small>Unidades nos postos</small>
+            <b>{items ? num(stats.atPostos) : '…'}</b>
+          </div>
+          <div className="stat">
+            <small>Valor no almoxarifado</small>
+            <b>{items ? money(stats.value) : '…'}</b>
+          </div>
+        </div>
+
+        {stats.low > 0 && filter !== 'baixo' ? (
+          <div className="banner">
+            <AlertTriangle size={20} color="var(--mustard)" />
+            <span>
+              {stats.low} {stats.low === 1 ? 'item chegou' : 'itens chegaram'} ao estoque mínimo ou abaixo.
+            </span>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setView('itens'); setFilter('baixo'); }}>
+              Ver itens
+            </button>
+          </div>
+        ) : null}
+
+        <div className="toolbar">
+          <div className="filter-seg" role="tablist" aria-label="Seção">
+            <button className={view === 'itens' ? 'is-active' : ''} onClick={() => setView('itens')}>
+              Itens
+            </button>
+            <button className={view === 'historico' ? 'is-active' : ''} onClick={() => setView('historico')}>
+              Histórico
+            </button>
+          </div>
+          {view === 'itens' ? (
+            <>
+              <div className="search">
+                <Search size={17} />
+                <input className="input" placeholder="Buscar por nome, tamanho ou ref." value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Buscar itens" />
+              </div>
+              <div className="select-wrap">
+                <select className="select" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Ordenar por">
+                  <option value="nome">Nome (A–Z)</option>
+                  <option value="menor">Menor saldo primeiro</option>
+                  <option value="maior">Maior saldo primeiro</option>
+                  <option value="valor">Maior valor em estoque</option>
+                  <option value="recente">Cadastrados recentemente</option>
+                </select>
+                <ChevronDown size={16} />
+              </div>
+            </>
+          ) : null}
+        </div>
+
+        {view === 'itens' ? (
+          <>
+            {cats.length ? (
+              <div className="cat-bar" aria-label="Filtrar por categoria">
+                <small>Categoria</small>
+                <div className="cat-chips">
+                  <button className={`cat-chip${!cat ? ' is-on' : ''}`} aria-pressed={!cat} onClick={() => setCat('')}>
+                    Todas <em>{num(list.length)}</em>
+                  </button>
+                  {cats.map((c) => (
+                    <button key={c.name} className={`cat-chip${cat === c.name ? ' is-on' : ''}`} aria-pressed={cat === c.name} onClick={() => setCat(cat === c.name ? '' : c.name)}>
+                      {c.name} <em>{num(c.n)}</em>
+                    </button>
+                  ))}
+                  {uncategorized ? (
+                    <button className={`cat-chip${cat === NONE ? ' is-on' : ''}`} aria-pressed={cat === NONE} onClick={() => setCat(cat === NONE ? '' : NONE)}>
+                      Sem categoria <em>{num(uncategorized)}</em>
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            <div className="filter-seg" style={{ marginBottom: 14 }}>
+              {FILTERS.map((f) => (
+                <button key={f.id} className={filter === f.id ? 'is-active' : ''} onClick={() => setFilter(f.id)}>
+                  {f.label} <em>{num(f.n)}</em>
+                </button>
+              ))}
+            </div>
+
+            {items === null && failed ? (
+              <LoadError what="o estoque" />
+            ) : items === null ? (
+              <div className="stock-table">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="skeleton" style={{ height: 58, borderRadius: 0 }} />
+                ))}
+              </div>
+            ) : shown.length === 0 ? (
+              <div className="empty">
+                <span className="empty-icon">
+                  <PackageSearch size={24} />
+                </span>
+                <strong>{list.length === 0 ? 'O estoque está vazio' : 'Nada encontrado'}</strong>
+                <span>
+                  {list.length === 0
+                    ? 'Cadastre o primeiro item ou importe a planilha do estoque.'
+                    : cat ? 'Tente outro termo, outra categoria ou mude o filtro.' : 'Tente outro termo ou mude o filtro.'}
+                </span>
+              </div>
+            ) : (
+              <div className="stock-table">
+                <div className="stock-row head" aria-hidden>
+                  <span>Item</span>
+                  <span className="num">Almoxarifado</span>
+                  <span className="num">Nos postos</span>
+                  <span className="num">Mínimo</span>
+                  <span className="num">Custo</span>
+                  <span />
+                </div>
+                {shown.slice(0, limit).map((i) => (
+                  <button key={i.id} className="stock-row" onClick={() => setOpenId(i.id)} aria-label={`Abrir ${itemLabel(i)}`}>
+                    <span className="stock-name">
+                      <b title={i.name}>
+                        {i.name}
+                        {i.active === false ? <em className="cat-tag" style={{ marginLeft: 6 }}>inativo</em> : null}
+                      </b>
+                      <small>
+                        {[i.code, i.size ? `Tam. ${i.size}` : null, i.unit, i.code ? null : `Ref. ${refLabel(i.ref)}`, i.reserved ? `${num(i.reserved)} reservado(s) · disponível ${num(i.quantity - i.reserved)}` : null].filter(Boolean).join(' · ')}
+                      </small>
+                      <CategoryTags list={i.categories} />
+                    </span>
+                    <span className={`num c-almox qty${i.quantity === 0 ? ' zero' : isLow(i) ? ' low' : ''}`}>
+                      {isLow(i) ? <AlertTriangle size={14} aria-label="Estoque baixo" /> : null}
+                      {num(i.quantity)}
+                    </span>
+                    <span className="num mut c-hide">{num(i.at_postos)}</span>
+                    <span className="num mut c-hide">{i.min_quantity ? num(i.min_quantity) : '—'}</span>
+                    <span className="num mut c-hide">{money(i.cost)}</span>
+                    <span className="c-meta">
+                      <span>Postos: {num(i.at_postos)}</span>
+                      {i.min_quantity ? <span>Mín.: {num(i.min_quantity)}</span> : null}
+                      <span>{money(i.cost)}</span>
+                    </span>
+                    <ChevronRight size={18} className="row-chevron" />
+                  </button>
+                ))}
+                {shown.length > limit ? (
+                  <div className="more-row">
+                    <button className="btn btn-ghost btn-sm" onClick={() => setLimit((l) => l + PAGE)}>
+                      Mostrar mais ({num(shown.length - limit)})
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            )}
+            {items && shown.length ? (
+              <p className="help" style={{ marginTop: 12 }}>
+                {num(shown.length)} {shown.length === 1 ? 'item' : 'itens'}
+                {shown.length !== list.length ? ` de ${num(list.length)}` : ''}. Toque em um item para movimentar, editar ou ver onde ele está.
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <div className="panel">
+            <MovementFeed version={version} />
+          </div>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {openItem ? (
+          <ItemDrawer
+            key="drawer"
+            item={openItem}
+            options={options}
+            reload={reload}
+            version={version}
+            onClose={() => setOpenId(null)}
+            onQty={(kind) => setQty({ itemId: openItem.id, kind })}
+            onSend={() => setSend({ itemId: openItem.id })}
+            onEdit={() => setForm({ item: openItem })}
+            onDelete={() => setDel(openItem)}
+            onPurchase={onPurchase ? () => onPurchase(openItem.id) : undefined}
+            onWriteoff={catalog.ready ? () => setWriteoff(openItem) : undefined}
+            groupLabel={openItem.cat_code ? `${categoryName(openItem.cat_code) ?? ''} › ${groupName(catalog.groups, openItem.cat_code, openItem.grp_code) ?? ''}` : null}
+            modalOpen={Boolean(form || qty || send || importing || del || writeoff)}
+          />
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {form ? <ItemFormModal key="form" item={form.item} options={options} initialCategories={!form.item && cat && cat !== NONE ? [cat] : undefined} onClose={() => setForm(null)} onSaved={reload} /> : null}
+        {qty && qtyItem ? (
+          <QtyModal key="qty" item={qtyItem} kind={qty.kind} onClose={() => setQty(null)} onSaved={reload} />
+        ) : null}
+        {send && items && postos ? (
+          <SendModal key="send" items={items} postos={postos} initialItemId={send.itemId} onClose={() => setSend(null)} onSaved={reload} />
+        ) : null}
+        {importing ? <ImportDialog key="imp" kind="itens" onClose={() => setImporting(false)} onDone={reload} /> : null}
+        {classify && items ? <ClassifySheet key="cls" items={items} onClose={() => setClassify(false)} onDone={() => { setClassify(false); reload(); }} /> : null}
+        {inventory && items ? <InventorySheet key="inv" items={items} onClose={() => setInventory(false)} onDone={() => { setInventory(false); reload(); }} /> : null}
+        {writeoff ? <WriteoffSheet key="wo" item={writeoff} onClose={() => setWriteoff(null)} onDone={() => { setWriteoff(null); reload(); }} /> : null}
+      </AnimatePresence>
+
+      <ConfirmModal
+        open={Boolean(del)}
+        title="Excluir este item?"
+        text={
+          del
+            ? `"${itemLabel(del)}" sai do estoque${del.quantity + del.at_postos > 0 ? ` (${num(del.quantity + del.at_postos)} unidade${del.quantity + del.at_postos === 1 ? '' : 's'} no total, contando os postos)` : ''}. O histórico fica guardado. Não dá para desfazer.`
+            : ''
+        }
+        confirmLabel="Excluir"
+        danger
+        busy={delBusy}
+        onConfirm={async () => {
+          if (!del) return;
+          setDelBusy(true);
+          try {
+            await api(`/api/almoxarifado/stock/${del.id}`, { method: 'DELETE' });
+            toast({ kind: 'success', title: 'Item excluído', text: itemLabel(del) });
+            setOpenId(null);
+            setDel(null);
+            reload();
+          } catch (err) {
+            toast({ kind: 'error', title: 'Não foi possível excluir', text: (err as Error).message });
+          } finally {
+            setDelBusy(false);
+          }
+        }}
+        onClose={() => !delBusy && setDel(null)}
+      />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* gaveta de detalhes do item                                          */
+/* ------------------------------------------------------------------ */
+function ItemDrawer({
+  item,
+  options,
+  reload,
+  version,
+  onClose,
+  onQty,
+  onSend,
+  onEdit,
+  onDelete,
+  onPurchase,
+  onWriteoff,
+  groupLabel,
+  modalOpen,
+}: {
+  onPurchase?: () => void;
+  onWriteoff?: () => void;
+  groupLabel?: string | null;
+  item: StockItem;
+  options: string[];
+  reload: () => Promise<void>;
+  version: number;
+  onClose: () => void;
+  onQty: (k: QtyKind) => void;
+  onSend: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  modalOpen: boolean;
+}) {
+  const [detail, setDetail] = useState<{ at_postos: { posto_id: string; posto_name: string; quantity: number }[]; movements: StockMovement[] } | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setDetail(await api(`/api/almoxarifado/stock/${item.id}`));
+    } catch {
+      /* mantém o que já está na tela */
+    }
+  }, [item.id]);
+  useEffect(() => {
+    load();
+  }, [load, version, item.quantity, item.at_postos]);
+
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => e.key === 'Escape' && !modalOpen && onClose();
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [onClose, modalOpen]);
+
+  // categorias: salva na hora, sem mexer em saldo nem histórico
+  const toast = useToast();
+  const [cats, setCats] = useState(item.categories);
+  const [savingCats, setSavingCats] = useState(false);
+  const catsKey = item.categories.join('|');
+  useEffect(() => {
+    setCats(item.categories);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id, catsKey]);
+  const saveCats = async (next: string[]) => {
+    const before = cats;
+    setCats(next);
+    setSavingCats(true);
+    try {
+      await api(`/api/almoxarifado/stock/${item.id}`, { method: 'PATCH', json: { categories: next } });
+      await reload();
+    } catch (err) {
+      setCats(before);
+      toast({ kind: 'error', title: 'Não foi possível salvar a categoria', text: (err as Error).message });
+    } finally {
+      setSavingCats(false);
+    }
+  };
+
+  const low = isLow(item);
+  return (
+    <motion.div className="drawer-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+      <motion.aside
+        className="drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label={itemLabel(item)}
+        {...fx.drawer}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="drawer-top">
+          <div style={{ minWidth: 0 }}>
+            <h2>{item.name}</h2>
+            <p>
+              {[item.code, item.size ? `Tam. ${item.size}` : null, item.unit, `Ref. ${refLabel(item.ref)}`].filter(Boolean).join(' · ')}
+              {item.active === false ? <span className="badge"> Inativo</span> : null}
+              {low ? (
+                <>
+                  {' '}
+                  <span className="badge">
+                    <AlertTriangle size={12} /> Estoque baixo
+                  </span>
+                </>
+              ) : null}
+            </p>
+          </div>
+          <button className="icon-btn" onClick={onClose} aria-label="Fechar">
+            <X size={19} />
+          </button>
+        </div>
+        <div className="drawer-body">
+          <div className="mini-stats">
+            <div>
+              <small>Almoxarifado</small>
+              <b style={{ color: low ? 'var(--mustard)' : undefined }}>{num(item.quantity)}</b>
+            </div>
+            <div>
+              <small>Nos postos</small>
+              <b>{num(item.at_postos)}</b>
+            </div>
+            <div>
+              <small>{item.reserved ? 'Disponível' : 'Total'}</small>
+              <b>{num(item.reserved ? item.quantity - item.reserved : item.quantity + item.at_postos)}</b>
+            </div>
+          </div>
+          {item.reserved ? (
+            <p className="help" style={{ margin: '-6px 0 0' }}>
+              {num(item.reserved)} {item.reserved === 1 ? 'unidade reservada' : 'unidades reservadas'} para pedidos de material (ainda no almoxarifado, mas já separadas).
+            </p>
+          ) : null}
+
+          <div className="drawer-actions edit-only">
+            <button className="btn btn-primary btn-sm" onClick={onSend} disabled={item.quantity < 1}>
+              <Send size={15} /> Enviar a posto
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => onQty('entrada')}>
+              <ArrowDownToLine size={15} /> Entrada
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => onQty('saida')} disabled={item.quantity < 1}>
+              <ArrowUpFromLine size={15} /> Saída
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => onQty('ajuste')}>
+              <SlidersHorizontal size={15} /> Ajustar saldo
+            </button>
+            {onWriteoff ? (
+              <button className="btn btn-ghost btn-sm" onClick={onWriteoff} disabled={item.quantity - item.reserved < 1}>
+                <PackageX size={15} /> Baixa (perda ou fornecedor)
+              </button>
+            ) : null}
+          </div>
+          {onPurchase ? (
+            <div className="drawer-actions">
+              <button data-lyco="item-pedir-compra" className={`btn btn-sm ${low ? 'btn-primary' : 'btn-ghost'}`} onClick={onPurchase}>
+                <ShoppingCart size={15} /> Pedir compra deste item
+              </button>
+            </div>
+          ) : null}
+
+          <div>
+            <h3 className="sec-title">Categorias</h3>
+            <div className="edit-only">
+              <CategoryPicker value={cats} options={options} onChange={saveCats} disabled={savingCats} idPrefix="drawer-cat" />
+              <p className="help" style={{ marginTop: 8 }}>
+                Um item pode ter mais de uma categoria. Ex.: Acessório e Fardamento.
+              </p>
+            </div>
+            <div className="readonly-only">
+              <CategoryTags list={cats} empty="Sem categoria" />
+            </div>
+          </div>
+
+          <div>
+            <h3 className="sec-title">Dados</h3>
+            {item.code ? (
+              <div className="kv-row">
+                <span>Código</span>
+                <b>
+                  {item.code}
+                  {groupLabel ? <small style={{ display: 'block', color: 'var(--muted)', fontWeight: 500 }}>{groupLabel}</small> : null}
+                </b>
+              </div>
+            ) : null}
+            <div className="kv-row">
+              <span>Estoque mínimo</span>
+              <b>{item.min_quantity ? num(item.min_quantity) : 'Não definido'}</b>
+            </div>
+            {[
+              ['Estoque máximo', item.max_quantity != null ? num(item.max_quantity) : null],
+              ['Prazo de reposição', item.lead_days != null ? `${item.lead_days} dias` : null],
+              ['Estoque de segurança', item.safety_qty != null ? num(item.safety_qty) : null],
+              ['Marca/modelo', item.brand],
+              ['CA (EPI)', item.ca_number],
+              ['Localização', item.location],
+            ]
+              .filter(([, v]) => v)
+              .map(([k, v]) => (
+                <div className="kv-row" key={k as string}>
+                  <span>{k}</span>
+                  <b>{v}</b>
+                </div>
+              ))}
+            <div className="kv-row">
+              <span>Custo unitário</span>
+              <b>{money(item.cost)}</b>
+            </div>
+            <div className="kv-row">
+              <span>Valor no almoxarifado</span>
+              <b>{item.cost === null ? '—' : money(item.quantity * item.cost)}</b>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="sec-title">Nos postos</h3>
+            {detail === null ? (
+              <div className="skeleton" style={{ height: 44 }} />
+            ) : detail.at_postos.length === 0 ? (
+              <div className="empty-line">Nenhum posto tem este item no momento.</div>
+            ) : (
+              detail.at_postos.map((p) => (
+                <div className="kv-row" key={p.posto_id}>
+                  <span>{p.posto_name}</span>
+                  <b>{num(p.quantity)}</b>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div>
+            <h3 className="sec-title">Últimas movimentações</h3>
+            {detail === null ? (
+              <div className="skeleton" style={{ height: 80 }} />
+            ) : detail.movements.length === 0 ? (
+              <div className="empty-line">Sem movimentações registradas.</div>
+            ) : (
+              detail.movements.slice(0, 15).map((m) => <MovementRow key={m.id} m={m} showItem={false} />)
+            )}
+          </div>
+
+          <div className="drawer-actions edit-only" style={{ marginTop: 'auto' }}>
+            <button className="btn btn-ghost btn-sm" onClick={onEdit}>
+              <Pencil size={15} /> Editar dados
+            </button>
+            {onWriteoff ? (
+              <button
+                className="btn btn-ghost btn-sm"
+                title={item.active === false ? 'Volta a aparecer nos pedidos e nas buscas' : 'Some dos pedidos e das buscas, mas o histórico fica'}
+                onClick={async () => {
+                  try {
+                    await api(`/api/almoxarifado/stock/${item.id}`, { method: 'PATCH', json: { active: item.active === false } });
+                    toast({ kind: 'success', title: item.active === false ? 'Item reativado' : 'Item desativado', text: itemLabel(item) });
+                    await reload();
+                  } catch (err) {
+                    toast({ kind: 'error', title: 'Não foi possível', text: (err as Error).message });
+                  }
+                }}
+              >
+                {item.active === false ? 'Reativar item' : 'Desativar item'}
+              </button>
+            ) : null}
+            <button className="btn btn-danger btn-sm" onClick={onDelete}>
+              <Trash2 size={15} /> Excluir item
+            </button>
+          </div>
+        </div>
+      </motion.aside>
+    </motion.div>
+  );
+}

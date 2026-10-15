@@ -1,0 +1,142 @@
+/* =========================================================
+   Animações 3D da Lyceg (html[data-fx] = full | lite | off)
+   ========================================================= */
+
+/* fundo "abismo" das ferramentas e do login */
+.abyss {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  /* atrás de tudo (acima só do fundo da página): não cria camadas que prendam janelas e menus */
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.9;
+}
+html:not([data-fx='off']) .dash {
+  background: transparent;
+}
+html:not([data-fx='off']) .side {
+  background: rgba(var(--bg-rgb), 0.78);
+}
+
+/* ---------- entrada em 3D: tudo "emerge" da profundidade ao aparecer ---------- */
+@keyframes fx-surface {
+  from {
+    opacity: 0;
+    transform: perspective(1000px) translate3d(0, 26px, -90px) rotateX(16deg);
+    transform-origin: 50% 100%;
+  }
+}
+@keyframes fx-slide-in {
+  from {
+    opacity: 0;
+    transform: perspective(900px) translate3d(-14px, 0, -50px) rotateX(-10deg);
+  }
+}
+@keyframes fx-count {
+  from {
+    opacity: 0;
+    transform: perspective(500px) translateY(10px) rotateX(-70deg);
+  }
+}
+html:not([data-fx='off'])
+  :is(.p-row, .stock-row, .stat, .g-card, .hub-card, .posto-card, .o-item, .o-term, .n-line, .move-row, .user-row, .t-table tbody tr, .mini-stats > div, .empty, .blank-tool, .banner, .o-plan, .o-routing, .p-item, .answer, .kv-row, .mt-card, .center-card, .req-card, .contact, .detail-hero, .lyco-card, .fr-card, .fr-tr, .board-col) {
+  animation: fx-surface 0.62s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+html:not([data-fx='off']) :is(.section-head h1, .section-head p, .side .brand) {
+  animation: fx-slide-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+html:not([data-fx='off']) .section-head p {
+  animation-delay: 0.07s;
+}
+html:not([data-fx='off']) :is(.stat b, .mini-stats b, .nav-count, .pbadge) {
+  display: inline-block;
+  animation: fx-count 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: 0.18s;
+}
+html:not([data-fx='off']) .stat b,
+html:not([data-fx='off']) .mini-stats b {
+  display: block;
+}
+html:not([data-fx='off']) .nav-item {
+  animation: fx-slide-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+/* escada: um depois do outro */
+html:not([data-fx='off']) :is(.p-row, .stock-row, .stat, .g-card, .hub-card, .posto-card, .o-item, .move-row, .user-row, .t-table tbody tr, .nav-item, .kv-row, .n-line, .mini-stats > div, .fr-card, .fr-tr, .board-col):nth-child(2) { animation-delay: 0.045s; }
+html:not([data-fx='off']) :is(.p-row, .stock-row, .stat, .g-card, .hub-card, .posto-card, .o-item, .move-row, .user-row, .t-table tbody tr, .nav-item, .kv-row, .n-line, .mini-stats > div, .fr-card, .fr-tr, .board-col):nth-child(3) { animation-delay: 0.09s; }
+html:not([data-fx='off']) :is(.p-row, .stock-row, .stat, .g-card, .hub-card, .posto-card, .o-item, .move-row, .user-row, .t-table tbody tr, .nav-item, .kv-row, .n-line, .mini-stats > div, .fr-card, .fr-tr, .board-col):nth-child(4) { animation-delay: 0.135s; }
+html:not([data-fx='off']) :is(.p-row, .stock-row, .stat, .g-card, .hub-card, .posto-card, .o-item, .move-row, .user-row, .t-table tbody tr, .nav-item, .kv-row, .n-line, .mini-stats > div, .fr-card, .fr-tr, .board-col):nth-child(5) { animation-delay: 0.18s; }
+html:not([data-fx='off']) :is(.p-row, .stock-row, .stat, .g-card, .hub-card, .posto-card, .o-item, .move-row, .user-row, .t-table tbody tr, .nav-item, .kv-row, .n-line, .mini-stats > div, .fr-card, .fr-tr, .board-col):nth-child(6) { animation-delay: 0.225s; }
+html:not([data-fx='off']) :is(.p-row, .stock-row, .stat, .g-card, .hub-card, .posto-card, .o-item, .move-row, .user-row, .t-table tbody tr, .nav-item, .kv-row, .n-line, .mini-stats > div, .fr-card, .fr-tr, .board-col):nth-child(7) { animation-delay: 0.27s; }
+html:not([data-fx='off']) :is(.p-row, .stock-row, .stat, .g-card, .hub-card, .posto-card, .o-item, .move-row, .user-row, .t-table tbody tr, .nav-item, .kv-row, .n-line, .mini-stats > div, .fr-card, .fr-tr, .board-col):nth-child(8) { animation-delay: 0.315s; }
+html:not([data-fx='off']) :is(.p-row, .stock-row, .stat, .g-card, .hub-card, .posto-card, .o-item, .move-row, .user-row, .t-table tbody tr, .nav-item, .kv-row, .n-line, .mini-stats > div, .fr-card, .fr-tr, .board-col):nth-child(n + 9) { animation-delay: 0.36s; }
+
+/* ---------- mouse por cima (modo full): a peça se ergue e gira, com reflexo azul/mostarda ---------- */
+html[data-fx='full'] .is-tilting {
+  transform: perspective(1000px) rotateX(var(--rx, 0)) rotateY(var(--ry, 0)) translate3d(0, -3px, 14px);
+  transition: transform 0.14s ease-out, box-shadow 0.25s, border-color 0.2s, background-color 0.2s;
+  will-change: transform;
+  box-shadow: 0 26px 40px -24px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(var(--royal-rgb), 0.22), 0 12px 30px -18px rgba(var(--royal-rgb), 0.5);
+  background-image:
+    radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(var(--royal-rgb), 0.12), transparent 55%),
+    linear-gradient(115deg, transparent 40%, rgba(var(--mustard-rgb), 0.06) 50%, transparent 60%);
+}
+html[data-fx='full'] .tilt-out {
+  transform: perspective(1000px) rotateX(0) rotateY(0) translate3d(0, 0, 0);
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s;
+}
+html[data-fx='full'] :is(.btn, .nav-item, .tab, .chip, .cat-chip, .filter-seg button, .pbadge, .avatar).is-tilting {
+  transform: perspective(600px) rotateX(var(--rx, 0)) rotateY(var(--ry, 0)) translate3d(0, -1px, 8px);
+  box-shadow: none;
+  background-image: none;
+}
+
+/* ---------- clique: a peça desce sobre a própria base (efeito tecla) ---------- */
+html:not([data-fx='off']) :is(.btn, .icon-btn, .nav-item, .tab, .chip, .cat-chip, .p-step, .filter-seg button, .seg-btn):active:not(:disabled) {
+  transform: perspective(500px) translate3d(0, 2px, -10px) !important;
+  transition: transform 0.06s;
+}
+
+/* ---------- gavetas e janelas giram a partir da borda ---------- */
+.drawer {
+  transform-origin: 100% 50%;
+}
+.toast {
+  transform-origin: 50% 0;
+}
+
+
+/* ---------- carregando: brilho que atravessa em profundidade ---------- */
+@keyframes fx-skel {
+  0%,
+  100% {
+    transform: perspective(800px) rotateX(0deg);
+  }
+  50% {
+    transform: perspective(800px) rotateX(6deg) translateZ(-10px);
+  }
+}
+html:not([data-fx='off']) .skeleton {
+  animation: shimmer 1.3s linear infinite, fx-skel 2.4s ease-in-out infinite;
+}
+
+/* ---------- impressão e quem pediu menos movimento ---------- */
+@media print {
+  .abyss {
+    display: none;
+  }
+}
+html[data-fx='off'] .abyss {
+  display: none;
+}
+html:not([data-fx='off']) .mobile-top {
+  background: rgba(var(--bg-rgb), 0.86);
+}
+
+/* quem pediu menos movimento no sistema: as peças aparecem sem as entradas em 3D */
+@media (prefers-reduced-motion: reduce) {
+  html :is(.p-row, .stock-row, .stat, .g-card, .hub-card, .posto-card, .o-item, .o-term, .n-line, .move-row, .user-row, .t-table tbody tr, .mini-stats > div, .empty, .blank-tool, .banner, .o-plan, .o-routing, .p-item, .answer, .kv-row, .mt-card, .center-card, .req-card, .contact, .detail-hero, .lyco-card, .fr-card, .fr-tr, .board-col, .section-head h1, .section-head p, .side .brand, .nav-item, .stat b, .mini-stats b, .nav-count, .pbadge, .col3d-bar) {
+    animation: none !important;
+  }
+}
