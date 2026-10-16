@@ -26,7 +26,7 @@ const FAKE = `
   if (window.speechSynthesis) window.speechSynthesis.speak = (u) => { window.__spoken.push(u.text); setTimeout(()=>{u.onstart&&u.onstart({}); setTimeout(()=>u.onend&&u.onend({}), 300);}, 20); };
   window.__hits = [];
   const seen = new Set();
-  new MutationObserver((ms) => { for (const m of ms) { const t = m.target; if (t.classList && t.classList.contains('lyco-hit') && !(m.oldValue || '').includes('lyco-hit') && !seen.has(t)) { seen.add(t); setTimeout(() => seen.delete(t), 300); window.__hits.push(t.getAttribute('data-tab') || t.getAttribute('data-max') || (t.id ? '#' + t.id : '') || t.getAttribute('href') || ''); } } })
+  new MutationObserver((ms) => { for (const m of ms) { const t = m.target; if (t.classList && t.classList.contains('lyco-hit') && !(m.oldValue || '').includes('lyco-hit') && !seen.has(t)) { seen.add(t); setTimeout(() => seen.delete(t), 300); window.__hits.push(t.getAttribute('data-tab') || t.getAttribute('data-lyco') || (t.id ? '#' + t.id : '') || t.getAttribute('href') || ''); } } })
     .observe(document, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
 `;
 async function newPage(browser) {
@@ -77,7 +77,7 @@ try {
   await page.waitForSelector('#hu-sector', { timeout: 10000 });
   ok((await page.inputValue('#hu-sector')) === 'rh', 'cadastro aberto já no setor RH');
   const h1 = await hits(page);
-  ok(h1.includes('/hub') && h1.includes('usuario-novo'), 'correu: Painel master → Usuários → Novo usuário: ' + JSON.stringify(h1));
+  ok(page.url().includes('/hub') && h1.includes('usuario-novo'), 'foi ao Painel master → Usuários → Novo usuário: ' + JSON.stringify(h1));
   await page.screenshot({ path: SHOTS + '/c1-usuario.png' });
   await page.keyboard.press('Escape');
   await page.waitForTimeout(600);

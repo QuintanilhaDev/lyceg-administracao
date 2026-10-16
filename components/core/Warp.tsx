@@ -1,7 +1,7 @@
 'use client';
 import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useRef } from 'react';
-import { setRunner, type RunStep } from '@/lib/lyco/runner';
+import { markLycoNavigation, setRunner, type RunStep } from '@/lib/lyco/runner';
 import { preloadSector } from '../setores/SectorApp';
 
 /**
@@ -145,17 +145,20 @@ export function WarpProvider({ children }: { children: React.ReactNode }) {
       };
       const job = chain.current.then(async () => {
         try {
+          let afterPath = false;
           for (const step of steps) {
             if (step.kind === 'path') {
+              markLycoNavigation();
               await push(step.path);
+              afterPath = true;
               hit();
             } else if (step.kind === 'tab') {
               step.exec();
               hit();
               await wait(0);
             } else {
-              // o botão pode estar numa tela que acabou de abrir: espera ele existir (até 4 s)
-              const el = await waitFirst(step.sel, step.exec ? 600 : 4000);
+              // o botão pode estar numa tela que acabou de abrir: espera ele existir (até 4 s; 12 s logo depois de trocar de página)
+              const el = await waitFirst(step.sel, step.exec ? 600 : afterPath ? 12000 : 4000);
               if (el && step.skipActive && el.classList.contains('is-active')) continue;
               hit();
               if (el) flash(el);

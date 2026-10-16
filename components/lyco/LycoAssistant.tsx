@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Keyboard, Mic, SendHorizontal, Square, ThumbsDown, ThumbsUp, Volume2, VolumeX, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { speak, stopSpeaking, loadVoices } from '@/lib/voice';
+import { lycoJustNavigated } from '@/lib/lyco/runner';
 import { capabilities } from '@/lib/lyco/skills-core';
 import { examplesFor, hear, think, type AgentAnswer, type RemoteAnswer } from '@/lib/lyco/engine';
 import { Listener, listenSupported, type ListenState } from '@/lib/lyco/speech';
@@ -402,7 +403,8 @@ export function LycoAssistant({ host }: { host: LycoHost }) {
     return () => {
       l.destroy();
       listener.current = null;
-      stopSpeaking();
+      // trocando de página por um pedido ao Lyco: a frase dele ("Abrindo…") continua na tela nova
+      if (!lycoJustNavigated()) stopSpeaking();
     };
   }, [ask]);
 

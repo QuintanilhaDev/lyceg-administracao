@@ -28,3 +28,12 @@ export function lycoRun(steps: RunStep[], onFirstHit?: () => void): Promise<void
   onFirstHit?.();
   return Promise.resolve();
 }
+
+/** momento da última troca de página pedida ao Lyco (a fala dele não é cortada pela troca) */
+let navAt = 0;
+export function markLycoNavigation() {
+  navAt = Date.now();
+}
+export function lycoJustNavigated(ms = 8000): boolean {
+  return Date.now() - navAt < ms;
+}
