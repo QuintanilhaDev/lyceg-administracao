@@ -1,5 +1,5 @@
 -- =====================================================================
---  Max Hub · Cadastro de fornecedores (setor Compras)
+--  Lyceg Administração · Cadastro de fornecedores (setor Compras)
 --
 --  Completa a tabela de fornecedores que as notas fiscais já usam: nome
 --  fantasia, contato, o que fornece, cidade, observações e ativo/inativo.

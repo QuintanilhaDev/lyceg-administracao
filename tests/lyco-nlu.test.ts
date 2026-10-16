@@ -61,6 +61,21 @@ const orders = [ord(1, 'solicitado'), ord(2, 'validacao', { origin: 'rh_troca' }
 const almoxP: LycoHost = { ...almoxC, pedidos: { scope: 'almox', orders: () => orders as never } };
 const opP: LycoHost = { ...base, scope: 'sector', sector: getSector('operacional'), user: user({ is_master: false, sector: 'operacional', sector_role: 'master' }), tabs: [{ id: 'pedidos', label: 'Pedidos de material', aliases: ['pedidos', 'pedidos de material'] }, { id: 'conta', label: 'Minha conta', aliases: ['conta', 'minha conta'] }], pedidos: { scope: 'operacao', orders: () => orders as never } };
 
+// frota
+const vei = (id: string, placa: string, over: Record<string, unknown> = {}) => ({ id, placa, tipo: 'CARRO', modelo: 'Onix', empresa: null, numero_frota: null, situacao: 'Operando', posto_id: null, posto_planilha: null, supervisor: null, fornecedor: 'Localiza', situacao_contrato: null, valor_locacao: null, valor_contratado: null, prazo_meses: null, data_recebimento: null, devolucao_prevista: null, km_entrega: null, km_atual: 40000, km_contratado: null, km_locadora: null, custo_por: null, status_combustivel: null, rastreador: null, tag: null, seguro: null, data_plotagem: null, obs: null, updated_by: null, updated_at: '', ...over });
+const fPostos = [{ id: 'fp1', name: 'Hospital Aliança', code: '10', city: 'Salvador', address: null, supervisor: null, lat: -12.98, lng: -38.46, geo_precision: 'exata' }, { id: 'fp2', name: 'Shopping Barra', code: '12', city: 'Salvador', address: null, supervisor: null, lat: null, lng: null, geo_precision: null }];
+const frotaData = {
+  veiculos: [vei('v1', 'ABC1D23', { posto_id: 'fp1' }), vei('v2', 'XYZ9A87', { tipo: 'MOTO', modelo: 'CG 160', situacao: 'Manutenção' }), vei('v3', 'QWE4R56', { devolucao_prevista: '2026-10-30', posto_id: 'fp2' })],
+  postos: fPostos,
+  km: [{ id: 'k1', veiculo_id: 'v1', mes: '2026-10-01', km1: null, km2: null, km3: null, km4: null, km_total: 2300, comb_cartao: null, posto_planilha: null, supervisor: null }],
+  despesas: [{ id: 'd1', data: '2026-10-05', empresa: null, tipo: null, placa: 'ABC1D23', prestador: null, cliente: null, servico: 'Troca de óleo', valor: 300, obs: null }],
+  multas: [{ id: 'm1', data_hora: '2026-10-03T10:00:00Z', tipo: null, ait: null, placa: 'ABC1D23', locadora: null, condutor: null, local: null, municipio: null, valor: 195.23, infracao: null }],
+  revisoes: [{ id: 'r1', data: '2026-06-01', placa: 'ABC1D23', tipo: null, servico: null, ultima_rev: 30000, prox_rev: 40500, descricao: null, item1: null, valor1: null, item2: null, valor2: null, item3: null, valor3: null, custo_total: 500, obs: null }],
+  lavagens: [{ id: 'l1', data: '2026-10-02', mes: null, placa: 'XYZ9A87', posto: null, vtr: null, valor: 60 }],
+};
+const frotaTabs = [{ id: 'mapa', label: 'Mapa 3D', aliases: ['mapa', 'mapa 3d'] }, { id: 'painel', label: 'Painel', aliases: ['painel', 'indicadores'] }, { id: 'veiculos', label: 'Veículos', aliases: ['veiculos', 'frota', 'carros'] }, { id: 'alocar', label: 'Alocar', aliases: ['alocar', 'alocacao'] }, { id: 'operacao', label: 'Operação', aliases: ['operacao', 'despesas', 'multas', 'lavagens'] }, { id: 'postos', label: 'Postos', aliases: ['postos'] }, { id: 'conta', label: 'Minha conta', aliases: ['conta', 'minha conta'] }];
+const frota: LycoHost = { ...base, scope: 'sector', sector: getSector('frota'), user: user({ is_master: false, sector: 'frota', sector_role: 'master' }), tabs: frotaTabs, frota: { data: () => frotaData as never } };
+
 type Case = [LycoHost, string, string | null];
 const CASES: Case[] = [
   // login
@@ -205,6 +220,27 @@ const BATTERY: [LycoHost, string[], string | null][] = [
   // pedidos de material
   [opP, ['validar a troca 3', 'aprova o pedido 3', 'valida o pedido número 3', 'cancelar o pedido 3 porque a pessoa desistiu', 'cancela a troca 3', 'encaminhar o pedido 3 ao almoxarifado'], 'act-order'],
   [almoxP, ['aplicar a sugestão do pedido de material 3', 'reservar o pedido de material 3', 'entregar o pedido de material 3', 'separar o material do pedido 3'], 'act-order'],
+  // frota
+  [frota, ['quantos veículos temos', 'qtos carros tem na frota', 'resumo da frota', 'quantas viaturas temos', 'quantas motos estão em manutenção', 'como está a frota'], 'frota-count'],
+  [frota, ['onde está a placa ABC1D23', 'cadê a ABC1D23', 'onde ta a viatura abc 1 d 23', 'abrir a ficha da XYZ9A87', 'a b c um d dois três', 'kd a vtr ABC1D23'], 'frota-where'],
+  [frota, ['quais veículos estão no posto 10', 'o que tem no posto hospital aliança', 'mostrar o posto 12 no mapa'], 'frota-posto'],
+  [frota, ['quais veículos estão sem posto', 'tem carro sem posto?', 'quais viaturas não estão alocadas'], 'frota-sem-posto'],
+  [frota, ['quais revisões estão vencendo', 'tem carro precisando de revisão?', 'revisões próximas'], 'frota-revisoes'],
+  [frota, ['quais devoluções estão próximas', 'que contratos vencem este mês', 'devoluções previstas'], 'frota-devolucoes'],
+  [frota, ['quanto gastamos com multas este mês', 'total de despesas da ABC1D23', 'quantas lavagens no mês passado', 'qto gastamos de multa hj', 'valor das multas da abc1d23'], 'frota-gastos'],
+  [frota, ['quantos km a ABC1D23 rodou este mês', 'qual o km atual da ABC1D23', 'qual a quilometragem da abc1d23'], 'frota-km'],
+  [frota, ['alocar a ABC1D23 no posto 12', 'mover a XYZ9A87 para o Hospital Aliança', 'manda a vtr XYZ9A87 pro posto 10', 'tirar a ABC1D23 do posto', 'transferir a QWE4R56 para o posto 10'], 'frota-alocar'],
+  [frota, ['colocar a ABC1D23 em manutenção', 'a XYZ9A87 voltou a operar', 'marcar a QWE4R56 como parado', 'a ABC1D23 tá na oficina'], 'frota-situacao'],
+  [frota, ['o km da ABC1D23 é 42500', 'atualizar a quilometragem da ABC1D23 para 43 mil', 'a ABC1D23 está com 41000 km agora'], 'frota-km-atual'],
+  [frota, ['cadastrar a placa JKL2M34', 'novo veículo', 'adicionar viatura', 'cadastrar as placas JKL2M34 e PQR5S67'], 'frota-novo-veiculo'],
+  [frota, ['lançar multa de 195 reais para a ABC1D23', 'registrar lavagem de 60 reais da XYZ9A87', 'nova despesa de 300 reais na ABC1D23 troca de óleo', 'a ABC1D23 tomou uma multa de 130 reais', 'registrar revisão da ABC1D23'], 'frota-registrar'],
+  [frota, ['abrir o mapa da frota', 'mapa'], 'frota-mapa'],
+  [frota, ['mostrar os veículos em manutenção', 'filtrar as motos', 'mostrar só os carros', 'mostrar os veículos da Localiza'], 'frota-filtrar'],
+  // variantes de escrita e fala
+  [almox, ['qto tem de bota 42', 'qtos bones tem no estoque', 'qnts botas 42 tem'], 'almox-stock-lookup'],
+  [almox, ['vc pode abrir o estoque', 'abre o estoque pra mim', 'kd o estoque', 'bora pro estoque'], 'go-tab'],
+  [almox, ['oq ta acabando', 'oq tá com estoque baixo', 'q itens tao zerados'], 'almox-stock-low'],
+  [hub, ['qtos usuarios tem', 'qnts usuários temos'], 'hub-users-count'],
   // perguntas não podem virar alteração
   [almox, ['quanto tem de bota 42', 'quantas botas 42 temos', 'tem bota 42 no estoque'], 'almox-stock-lookup'],
   [almox, ['como dou entrada no estoque', 'como faço inventário', 'me explica como lançar uma nota'], 'explain'],
@@ -471,6 +507,12 @@ const mem: LycoMemory = { last: null, lastInput: '', voiceOn: true, setVoice: ()
   }
 
   const show = async (host: LycoHost, p: string) => console.log(`\n> ${p}\n  ${(await think(hear(p).command, host, { memory: mem })).say}`);
+  if (process.argv.includes('--frota')) {
+    for (const p of ['resumo da frota', 'cadê a abc 1 d 23', 'quantas motos estão em manutenção', 'quanto gastamos com multas este mês', 'manda a vtr XYZ9A87 pro posto 10', 'a ABC1D23 tá na oficina', 'atualizar a quilometragem da ABC1D23 para 43 mil', 'lançar multa de 195 reais para a ABC1D23', 'nova despesa de 300 reais na ABC1D23, troca de óleo', 'cadastrar a placa JKL2M34', 'quais revisões estão vencendo', 'quais devoluções estão próximas', 'quantos km a ABC1D23 rodou este mês', 'o que tem no posto hospital aliança']) {
+      const r = await think(p, frota, { memory: { ...mem, heard: p } });
+      console.log(`> ${p}\n  ${r.text ?? r.say}${r.pending ? '  ' + JSON.stringify(r.pending[0].body) : ''}${r.card ? '  [card]' : ''}`);
+    }
+  }
   if (process.argv.includes('--show')) {
     await show(hub, 'Lyco quantos itens saíram do estoque do almoxarifado nas últimas 15 horas'); await show(almox, 'Lyco o que entrou no estoque ontem'); await show(almox, 'Lyco quantas botas saíram ontem'); await show(almox, 'Lyco quantas camisas saíram esta semana'); await show(almox, 'Lyco quantos coturnos saíram hoje'); await show(almox, 'Lyco métricas das últimas 15 horas'); await show(almox, 'Lyco o que saiu'); await show(almox, 'Lyco deslog da minha conta e me leve diretamente para a tela de login por favor');
     await show(hub, 'Lyco desejo baixar as métricas do financeiro'); await show(rh, 'Lyco quero baixar as métricas'); await show(hub, 'Lyco baixar métricas'); await show({ ...rh, user: user({ is_master: false, sector: 'rh' }) }, 'Lyco baixar as métricas do almoxarifado');

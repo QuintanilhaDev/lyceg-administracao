@@ -91,6 +91,14 @@ function showFilePick(btn: HTMLElement, inputSel: string) {
   setTimeout(close, 45000);
 }
 
+/** marca rapidinho o botão que o Lyco apertou (um brilho de sonar), sem atrasar o comando */
+function flash(el: HTMLElement) {
+  el.classList.remove('lyco-hit');
+  void el.offsetWidth;
+  el.classList.add('lyco-hit');
+  window.setTimeout(() => el.classList.remove('lyco-hit'), 650);
+}
+
 export function WarpProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -150,6 +158,7 @@ export function WarpProvider({ children }: { children: React.ReactNode }) {
               const el = await waitFirst(step.sel, step.exec ? 600 : 4000);
               if (el && step.skipActive && el.classList.contains('is-active')) continue;
               hit();
+              if (el) flash(el);
               if (step.exec) step.exec();
               else if (el?.dataset.lycoFile) showFilePick(el, el.dataset.lycoFile);
               else if (el) {

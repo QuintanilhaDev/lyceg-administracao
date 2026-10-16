@@ -1,8 +1,8 @@
 -- =====================================================================
---  Max · Aprendizado (memória do que ela já resolveu, anotações e pedidos não atendidos)
+--  Lyco · Aprendizado (memória do que ele já resolveu, anotações e pedidos não atendidos)
 --  Cole TODO este arquivo no SQL Editor do Supabase e clique em "Run".
 --  Pode rodar mais de uma vez. Não mexe em nenhuma tabela que já existe.
---  Sem este arquivo a Max funciona normalmente, só não aprende entre uma conversa e outra.
+--  Sem este arquivo o Lyco funciona normalmente, só não aprende entre uma conversa e outra.
 -- =====================================================================
 
 -- Pedidos já resolvidos: "frase" → comando da tela ou ferramenta usada.
@@ -24,7 +24,7 @@ create table if not exists public.lyco_learned (
 );
 create index if not exists lyco_learned_scope_idx on public.lyco_learned (scope, sector, updated_at desc);
 
--- Anotações ensinadas à Max ("lembre que o fornecedor de botas é a X").
+-- Anotações ensinadas ao Lyco ("lembre que o fornecedor de botas é a X").
 create table if not exists public.lyco_notes (
   id          uuid primary key default gen_random_uuid(),
   sector      text,                           -- null = vale para todos os setores
@@ -53,4 +53,4 @@ alter table public.lyco_misses  enable row level security;
 grant all on public.lyco_learned, public.lyco_notes, public.lyco_misses to service_role;
 
 notify pgrst, 'reload schema';
-select 'ok: aprendizado da Max ativado' as resultado;
+select 'ok: aprendizado do Lyco ativado' as resultado;

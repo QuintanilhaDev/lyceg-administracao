@@ -6,13 +6,13 @@ import type { Indicators } from './gestao';
  * Relatório de Gestão em PDF (A4): capa com os números principais, gráficos de barras
  * e as tabelas de atenção. Desenhado à mão com o pdfkit (vetorial, leve e nítido na impressão).
  */
-const INK = '#1D1430';
-const LILAC = '#2f5bea';
-const LILAC_SOFT = '#F1EAFF';
-const PURPLE = '#6B3FD6';
-const TEXT = '#241B3A';
-const MUTED = '#6B6483';
-const LINE = '#E3DAF6';
+const INK = '#0B0B0D';
+const LILAC = '#2546C9';
+const LILAC_SOFT = '#E8EEFF';
+const PURPLE = '#B07D0A';
+const TEXT = '#15171C';
+const MUTED = '#5E6472';
+const LINE = '#DCE1EC';
 const GREEN = '#1F9D6B';
 const RED = '#D6455D';
 const AMBER = '#B7791F';
@@ -51,14 +51,16 @@ export function gestaoPdf(d: Indicators, opts: { by: string; period: string }): 
     doc.rect(0, 0, W, 34).fill(INK);
     mark(M, 9, 16);
     font(true).fontSize(9).fillColor('#FFFFFF').text('Relatório de Gestão', M + 24, 13);
-    font().fontSize(8.5).fillColor('#CFC6E6').text(opts.period, M, 13, { width: CW, align: 'right' });
+    font().fontSize(8.5).fillColor('#C9D3EA').text(opts.period, M, 13, { width: CW, align: 'right' });
     y = 54;
   };
-  /** a marca da Lyceg (quadrado lilás com o ponto) */
+  /** a marca da Lyceg (escudo azul royal com o detalhe mostarda) */
   const mark = (x: number, yy: number, s: number) => {
-    doc.roundedRect(x, yy, s, s, s * 0.28).fill(LILAC);
-    doc.circle(x + s * 0.44, yy + s * 0.56, s * 0.2).fill(INK);
-    doc.circle(x + s * 0.72, yy + s * 0.28, s * 0.09).fill(INK);
+    // escudo: topo reto, laterais que afinam até a ponta
+    doc.save();
+    doc.moveTo(x + s * 0.5, yy).lineTo(x + s * 0.94, yy + s * 0.16).lineTo(x + s * 0.9, yy + s * 0.58).quadraticCurveTo(x + s * 0.82, yy + s * 0.86, x + s * 0.5, yy + s).quadraticCurveTo(x + s * 0.18, yy + s * 0.86, x + s * 0.1, yy + s * 0.58).lineTo(x + s * 0.06, yy + s * 0.16).closePath().fill(LILAC);
+    doc.rect(x + s * 0.3, yy + s * 0.44, s * 0.4, s * 0.1).fill('#E3A92F');
+    doc.restore();
   };
   const section = (title: string, sub?: string) => {
     ensure(70);
@@ -76,10 +78,10 @@ export function gestaoPdf(d: Indicators, opts: { by: string; period: string }): 
   for (let i = 0; i < 7; i++) doc.circle(W - 40, 30, 40 + i * 26).lineWidth(1).stroke(LILAC);
   doc.restore();
   mark(M, 38, 30);
-  font(true).fontSize(11).fillColor('#4c7dff').text('MAX HUB · GRUPO MAX FORTE', M + 42, 47);
+  font(true).fontSize(11).fillColor('#E3A92F').text('LYCEG ADMINISTRAÇÃO · SEGURANÇA', M + 42, 47);
   font(true).fontSize(28).fillColor('#FFFFFF').text('Relatório de Gestão', M, 84);
-  font().fontSize(12).fillColor('#E2D4FF').text(opts.period, M, 120);
-  font().fontSize(9).fillColor('#A99FC4').text(`Gerado em ${bahia(new Date(d.at))} por ${opts.by}`, M, 140);
+  font().fontSize(12).fillColor('#DCE4FF').text(opts.period, M, 120);
+  font().fontSize(9).fillColor('#9AA3B8').text(`Gerado em ${bahia(new Date(d.at))} por ${opts.by}`, M, 140);
   y = 194;
 
   /* ---------------- cartões ---------------- */
@@ -184,7 +186,7 @@ export function gestaoPdf(d: Indicators, opts: { by: string; period: string }): 
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(range.start + i);
     doc.moveTo(M, H - 38).lineTo(W - M, H - 38).lineWidth(0.6).stroke(LINE);
-    font().fontSize(7.5).fillColor(MUTED).text('Lyceg Administração · Grupo Max Forte · Relatório de Gestão', M, H - 30, { lineBreak: false });
+    font().fontSize(7.5).fillColor(MUTED).text('Lyceg Administração · Relatório de Gestão', M, H - 30, { lineBreak: false });
     doc.text(`Página ${i + 1} de ${range.count}`, M, H - 30, { width: CW, align: 'right', lineBreak: false });
   }
   doc.end();

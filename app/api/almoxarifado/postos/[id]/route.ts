@@ -79,7 +79,13 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   if (!UUID_RE.test(id)) return fail('Posto não encontrado.', 404);
   try {
     const admin = await requireAlmox('postos', 'edit');
-    const { data, error } = await db().rpc('remove_posto', { p_posto: id, p_by: admin.display_name });
+    const first = await db().rpc('remove_posto', { p_posto: id, p_by: admin.display_name });
+    let data: unknown = first.data;
+    let error: { code?: string; message: string } | null = first.error;
+    if (error && /remove_posto|PGRST202|schema cache/i.test(`${error.code ?? ''} ${error.message ?? ''}`)) {
+      // banco sem a função remove_posto: devolve item por item (cada devolução é atômica) e depois remove o posto
+      ({ data, error } = await removePostoStepByStep(id, admin.display_name));
+    }
     if (error) {
       const m = dbMessage(error);
       if (m) return fail(m, 404);
@@ -91,4 +97,21 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   } catch (e) {
     return serverError(e);
   }
+}
+
+async function removePostoStepByStep(id: string, by: string): Promise<{ data: unknown; error: { code?: string; message: string } | null }> {
+  const { data: posto, error: e0 } = await db().from('postos').select('id, name').eq('id', id).maybeSingle();
+  if (e0) return { data: null, error: e0 };
+  if (!posto) return { data: null, error: { code: 'P0001', message: 'Posto não encontrado.' } };
+  const { data: rows, error: e1 } = await db().from('posto_stock').select('item_id, quantity').eq('posto_id', id).order('item_id');
+  if (e1) return { data: null, error: e1 };
+  let returned = 0;
+  for (const r of (rows ?? []) as { item_id: string; quantity: number }[]) {
+    const { error } = await db().rpc('stock_move', { p_item: r.item_id, p_kind: 'devolucao', p_qty: r.quantity, p_posto: id, p_note: 'Posto removido', p_by: by });
+    if (error) return { data: null, error };
+    returned += r.quantity;
+  }
+  const { error: e2 } = await db().from('postos').delete().eq('id', id);
+  if (e2) return { data: null, error: e2 };
+  return { data: { returned, name: posto.name }, error: null };
 }

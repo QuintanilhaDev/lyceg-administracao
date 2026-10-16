@@ -1,7 +1,7 @@
 -- =====================================================================
---  Max Hub · Projeto 3 — Estoque e Almoxarifado (especificação v2.0)
+--  Lyceg Administração · Projeto 3 — Estoque e Almoxarifado (especificação v2.0)
 --  Cole TODO este arquivo no SQL Editor do Supabase e clique em "Run".
---  Rode DEPOIS de: estoque.sql, baixa_e_usuarios.sql, maxhub.sql, categorias.sql e compras.sql.
+--  Rode DEPOIS de: estoque.sql, baixa_e_usuarios.sql, plataforma.sql, categorias.sql e compras.sql.
 --
 --  Cria: catálogo com código CC-GG-NNNN, fornecedores, notas fiscais (entradas),
 --  colaboradores, kits por função, pedidos de material (Operação / RH-DP),

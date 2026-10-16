@@ -79,6 +79,15 @@ function Shell() {
   }, [user, anyView, reload]);
   const anyRef = useRef(anyView);
   anyRef.current = anyView;
+  useEffect(() => {
+    // o Lyco acabou de alterar algo da frota: recarrega já
+    const on = (e: Event) => {
+      const paths = (e as CustomEvent<string[]>).detail ?? [];
+      if (anyRef.current && paths.some((p) => p.startsWith('/api/frota'))) void reload();
+    };
+    window.addEventListener('lyceg:changed', on);
+    return () => window.removeEventListener('lyceg:changed', on);
+  }, [reload]);
   useRealtime(
     (ev) => {
       if ((ev === 'frota:update' || ev === 'postos:update') && anyRef.current) void reload();

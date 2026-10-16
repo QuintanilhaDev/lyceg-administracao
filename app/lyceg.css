@@ -366,3 +366,15 @@ h3 {
   width: 16px;
   height: 16px;
 }
+
+/* botão apertado pelo Lyco: um anel de sonar rápido (não atrasa o comando) */
+.lyco-hit {
+  animation: lyco-hit 0.6s ease-out;
+}
+@keyframes lyco-hit {
+  0% { box-shadow: 0 0 0 0 rgba(var(--mustard-rgb), 0.75); }
+  100% { box-shadow: 0 0 0 14px rgba(var(--mustard-rgb), 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lyco-hit { animation: none; outline: 2px solid var(--mustard); }
+}

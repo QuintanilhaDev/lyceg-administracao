@@ -40,6 +40,7 @@ export function capabilities(host: LycoHost): string[] {
   if (host.sector?.slug === 'almoxarifado') {
     return ['Lyco, entrada de 10 botas 42', 'Lyco, enviar 5 camisas G para o Posto 01', 'Lyco, o que está com estoque baixo?', 'Lyco, marcar a solicitação 12 como resolvida'];
   }
+  if (host.sector?.slug === 'frota') return ['Lyco, resumo da frota', 'Lyco, cadê a ABC1D23?', 'Lyco, quais revisões estão vencendo?', 'Lyco, quanto gastamos com multas este mês?'];
   if (host.sector?.slug === 'rh') return ['Lyco, nova admissão', 'Lyco, cadastrar um colaborador', 'Lyco, importar a planilha de colaboradores', 'Lyco, como funciona a troca anual?'];
   if (host.sector?.slug === 'operacional') return ['Lyco, tem troca para validar?', 'Lyco, validar a troca 3', 'Lyco, novo pedido de material', 'Lyco, quantos pedidos estão em aberto?'];
   if (host.sector?.slug === 'financeiro') return ['Lyco, como funciona este setor?', 'Lyco, abrir notas e vencimentos', 'Lyco, que dia é hoje?', 'Lyco, quanto é 15% de 2400?'];
@@ -315,7 +316,7 @@ export const coreSkills: Skill[] = [
         return { say: 'Fui criado pela equipe da Lyceg para facilitar o dia a dia de todos os setores da empresa.' };
       }
       if (q.re(/\b(anos|idade|mulher|homem|pessoa|humana|robo|ia|inteligencia|real|dorme|come|sente|pensa|sentimentos|viva|verdade)\b/)) {
-        return { say: 'Sou um assistente virtual, um tubarão digital de chapéu: não tenho idade, mas estou sempre de plantão aqui na Lyceg.' };
+        return { say: 'Sou um assistente virtual, um tubarão digital de boné: não tenho idade, mas estou sempre de plantão aqui na Lyceg.' };
       }
       if (q.re(/\b(cara ou coroa|moeda)\b/)) return { say: `Deu ${pick(['cara', 'coroa'])}.` };
       if (q.re(/\b(dado|numero aleatorio|sorteie)\b/)) return { say: `Saiu o número ${1 + Math.floor(Math.random() * 6)}.` };

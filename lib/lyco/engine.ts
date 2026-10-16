@@ -5,6 +5,8 @@ import { comprasSkills } from './skills-compras';
 import { pedidosSkills } from './skills-pedidos';
 import { downloadSkills } from './skills-downloads';
 import { fornecedoresSkills } from './skills-fornecedores';
+import { frotaSkills } from './skills-frota';
+import { canonical } from './variants';
 import { ACTION_IDS, actionSkills } from './skills-actions';
 import { UI_IDS, uiSkills } from './skills-ui';
 import { manualFallback, manualSkills } from './skills-manual';
@@ -15,7 +17,7 @@ import { BLOCKED_REPLY, isBlocked } from './moderation';
 import type { LycoHost, LycoMemory, LycoReply, PendingAction, Skill } from './types';
 import { gaveUp, recall, type Learned } from './learn';
 
-const ALL: Skill[] = [...actionSkills, ...uiSkills, ...downloadSkills, ...fornecedoresSkills, ...coreSkills, ...almoxSkills, ...comprasSkills, ...pedidosSkills, ...manualSkills, ...hubSkills, ...emptySectorSkills];
+const ALL: Skill[] = [...actionSkills, ...uiSkills, ...downloadSkills, ...fornecedoresSkills, ...coreSkills, ...almoxSkills, ...comprasSkills, ...pedidosSkills, ...frotaSkills, ...manualSkills, ...hubSkills, ...emptySectorSkills];
 
 /** Abaixo disto o Lyco não tem certeza e passa a pergunta adiante (IA/Wikipedia) ou admite que não sabe. */
 export const CONFIDENT = 0.6;
@@ -98,6 +100,15 @@ function readings(norm: string): Query[] {
   const trimmed = politeTrim(norm);
   const list = [makeQuery(norm, norm)];
   if (trimmed && trimmed !== norm) list.push(makeQuery(trimmed, trimmed));
+  // variantes ("vc", "qtos", "cadê", "viatura", "tá", "pra"…) na forma que as habilidades conhecem
+  for (const base of [norm, trimmed]) {
+    const c = canonical(base);
+    if (c && !list.some((q) => q.norm === c)) {
+      const t = politeTrim(c);
+      list.push(makeQuery(c, c));
+      if (t && t !== c) list.push(makeQuery(t, t));
+    }
+  }
   return list;
 }
 
@@ -155,7 +166,7 @@ const SAFE_LOCAL = new Set(['stop', 'repeat', 'voice-off', 'voice-on', 'logout',
 /** comandos que nunca são disparados pela memória (a pessoa precisa pedir com clareza) */
 const NO_RECALL = new Set(['logout', 'stop', 'bye', 'voice-off', 'voice-on', 'say-hello', 'go-sector', 'hub-create-user']);
 
-const YES_RE = /^(sim|s|isso|isso mesmo|confirm\w*|pode|pode sim|pode fazer|pode confirmar|pode registrar|ok|okay|certo|claro|com certeza|positivo|manda|manda ver|faz|faca|execute|exato|correto|bora|vai|afirmativo|autorizo|autorizado)( sim| pode| confirmar| confirmo| confirmado| por favor| max| isso| faz| manda)*$/;
+const YES_RE = /^(sim|s|isso|isso mesmo|confirm\w*|pode|pode sim|pode fazer|pode confirmar|pode registrar|ok|okay|certo|claro|com certeza|positivo|manda|manda ver|faz|faca|execute|exato|correto|bora|vai|afirmativo|autorizo|autorizado)( sim| pode| confirmar| confirmo| confirmado| por favor| lyco| isso| faz| manda)*$/;
 const NO_RE = /^(nao|n|cancel\w*|deixa|deixa pra la|esquece|esqueca|negativo|para|pare|melhor nao|errado|nada|desist\w*)\b/;
 
 /** Executa as alterações confirmadas, chamando as rotas normais do sistema (com as permissões de quem está logado). */
@@ -177,12 +188,14 @@ async function executePending(list: PendingAction[]): Promise<LycoReply> {
       error = 'Sem conexão com o servidor.';
     }
     if (error) {
-      return { say: `${done.length ? `Fiz ${done.length === 1 ? 'uma parte' : `${done.length} partes`}, mas parei em: ` : 'Não consegui registrar: '}${a.what}. ${error}`, source: 'ia' };
+      return { say: `${done.length ? `Fiz ${done.length === 1 ? 'uma parte' : `${done.length} partes`}, mas parei em: ` : 'Não consegui registrar: '}${a.what}. ${error}` };
     }
     done.push(a.what);
   }
   if (!done.length) return { say: 'Não havia nada para registrar.' };
-  return { say: `Pronto: ${done.join('; ')}.`, source: 'ia' };
+  // as telas abertas recarregam na hora (sem esperar o aviso em tempo real)
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('lyceg:changed', { detail: list.map((a) => a.path) }));
+  return { say: `Pronto: ${done.join('; ')}.` };
 }
 
 export interface ThinkOptions {

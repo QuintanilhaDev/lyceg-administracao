@@ -2,7 +2,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import { secretKey } from './session';
 
 /**
- * Cerca de localização: para os usuários da lista (hoje só o @uesley), a plataforma só
+ * Cerca de localização: para os usuários da lista, a plataforma só
  * funciona dentro do terreno da empresa. Os demais entram de qualquer lugar.
  *
  * O navegador manda a posição; o servidor confere a distância até o ponto da empresa e,
@@ -13,7 +13,7 @@ import { secretKey } from './session';
  *
  * Ajustes (variáveis de ambiente na Vercel):
  *   GEO_FENCE=off           desliga a cerca
- *   GEO_USERS               usuários com cerca, separados por vírgula (padrão: uesley)
+ *   GEO_USERS               usuários com cerca, separados por vírgula (padrão: nenhum)
  *   GEO_LAT / GEO_LNG       ponto da empresa
  *   GEO_RADIUS_M            raio do terreno, em metros (padrão 150)
  *   GEO_MAX_ACCURACY_M      precisão mínima aceita do GPS, em metros (padrão 200)
@@ -31,7 +31,7 @@ export function geoConfig() {
     lng: num(process.env.GEO_LNG, -38.489956547863),
     radius: num(process.env.GEO_RADIUS_M, 150),
     maxAccuracy: num(process.env.GEO_MAX_ACCURACY_M, 200),
-    users: (process.env.GEO_USERS ?? 'uesley')
+    users: (process.env.GEO_USERS ?? '')
       .split(',')
       .map((u) => u.trim().toLowerCase().replace(/^@/, ''))
       .filter(Boolean),

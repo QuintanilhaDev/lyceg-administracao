@@ -30,7 +30,7 @@ export const MANUAL: ManualTopic[] = [
     title: 'A Lyceg',
     sector: null,
     keys: ['lyceg', 'plataforma', 'sistema', 'site', 'hub', 'aplicativo'],
-    summary: 'A Lyceg reúne os setores da empresa em um só lugar: Almoxarifado, Compras, RH, Operacional, Financeiro e Comercial. Cada pessoa entra direto no seu setor e vê só o que tem permissão.',
+    summary: 'A Lyceg reúne os setores da empresa em um só lugar: Almoxarifado, Compras, RH, Operacional, Financeiro, Comercial e Frota. Cada pessoa entra direto no seu setor e vê só o que tem permissão.',
     steps: [
       'Entre com seu usuário e senha. Você cai direto na ferramenta do seu setor; o master geral cai no Painel master.',
       'O menu ao lado (no celular, embaixo) mostra as telas que você pode abrir.',
@@ -342,6 +342,38 @@ export const MANUAL: ManualTopic[] = [
 
   /* ---------------- Compras ---------------- */
   {
+    id: 'frota',
+    title: 'Setor de Frota',
+    sector: 'frota',
+    tab: 'mapa',
+    keys: ['frota', 'setor de frota', 'veiculos', 'viaturas', 'carros', 'motos', 'mapa da frota', 'mapa 3d'],
+    summary: 'A Frota controla os veículos da Lyceg: onde cada um está alocado, a situação, o contrato com a locadora, o KM e os gastos da operação.',
+    steps: [
+      'Mapa 3D: cada posto vira um farol no mapa; a altura mostra quantos veículos ele tem. Arraste para girar e toque num farol para ver os veículos.',
+      'Painel: números da frota, revisões vencendo e devoluções previstas.',
+      'Veículos: cadastro e ficha de cada placa (contrato, KM mês a mês, revisões, despesas, multas e lavagens). Dá para colar várias placas de uma vez.',
+      'Alocar: arraste os veículos para os postos, ou selecione vários e escolha o posto.',
+      'Operação: lançamento de despesas, multas, revisões e lavagens, com filtro por mês e exportação em CSV.',
+      'Postos: localização de cada posto, buscada pelo endereço ou marcada à mão.',
+    ],
+    ask: 'Lyco, como funciona a frota?',
+  },
+  {
+    id: 'frota-comandos',
+    title: 'Comandos da Frota',
+    sector: 'frota',
+    keys: ['comandos da frota', 'o que posso pedir na frota', 'falar placa', 'ditar placa'],
+    summary: 'Na Frota eu entendo placas ditas inteiras, em pedaços ou letra por letra, e preparo alterações que só gravo depois do seu "sim".',
+    steps: [
+      'Consultar: "Lyco, cadê a ABC1D23?", "quantos veículos temos?", "quais revisões estão vencendo?", "quanto gastamos com multas este mês?".',
+      'Alocar: "Lyco, manda a ABC1D23 para o posto 10" ou "tirar a ABC1D23 do posto".',
+      'Situação e KM: "Lyco, a ABC1D23 está na oficina", "o KM da ABC1D23 é 42.500".',
+      'Lançar: "Lyco, multa de 195 reais para a ABC1D23", "lavagem de 60 reais da XYZ9A87", "despesa de 300 reais na ABC1D23, troca de óleo".',
+      'Cadastrar: "Lyco, cadastrar as placas ABC1D23 e XYZ9A87".',
+    ],
+    ask: 'Lyco, o que posso pedir na frota?',
+  },
+  {
     id: 'compras',
     title: 'Setor de Compras',
     sector: 'compras',
@@ -443,7 +475,7 @@ export const MANUAL: ManualTopic[] = [
     title: 'Operacional',
     sector: 'operacional',
     tab: 'pedidos',
-    keys: ['operacional', 'operacao', 'uesley', 'encaminhar', 'validar troca', 'conferir pedido', 'pedido do posto'],
+    keys: ['operacional', 'operacao', 'encaminhar', 'validar troca', 'conferir pedido', 'pedido do posto'],
     summary: 'A Operação confere os pedidos dos postos, encaminha ao Almoxarifado e valida as trocas anuais do RH.',
     steps: [
       'Abra Pedidos de material; o filtro Para conferir mostra o que espera a Operação.',
