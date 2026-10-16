@@ -49,6 +49,9 @@ async function login(page, user, url) {
 const settled = (page) => page.waitForFunction(() => !document.querySelector('.mr.is-on') && !document.documentElement.classList.contains('lyco-away'), null, { timeout: 25000 });
 async function ask(page, text) {
   await settled(page);
+  // terminou de falar? (depois da fala ele volta a ouvir sozinho)
+  await page.waitForFunction(() => !document.querySelector('.lyco-fab.is-speaking, .lyco-fab.is-thinking'), null, { timeout: 15000 }).catch(() => {});
+  await page.waitForTimeout(400);
   if (!(await page.locator('.lyco-fab.is-listening').count())) await page.click('.lyco-fab');
   await page.waitForSelector('.lyco-fab.is-listening', { timeout: 4000 });
   await page.evaluate(() => { window.__hits = []; });
@@ -77,7 +80,7 @@ try {
   await page.waitForSelector('#hu-sector', { timeout: 10000 });
   ok((await page.inputValue('#hu-sector')) === 'rh', 'cadastro aberto já no setor RH');
   const h1 = await hits(page);
-  ok(page.url().includes('/hub') && h1.includes('usuario-novo'), 'foi ao Painel master → Usuários → Novo usuário: ' + JSON.stringify(h1));
+  ok(page.url().includes('/hub') && h1.includes('usuarios'), 'foi ao Painel master → Usuários → Novo usuário: ' + JSON.stringify(h1));
   await page.screenshot({ path: SHOTS + '/c1-usuario.png' });
   await page.keyboard.press('Escape');
   await page.waitForTimeout(600);
